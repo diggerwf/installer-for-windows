@@ -2,8 +2,8 @@
 setlocal enabledelayedexpansion
 
 :: --- EINSTELLUNGEN ---
-set "REPO_URL=https://github.com/USER/PROJEKT.git"
-set "BRANCH=main"
+set "REPO_URL=https://github.com/diggerwf/installer-for-windows.git"
+set "BRANCH=beta-1"
 set "START_FILE=start.bat"
 
 :: Verhindert, dass Git ein Login-Fenster oeffnet

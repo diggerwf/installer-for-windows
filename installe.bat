@@ -2,21 +2,22 @@
 setlocal enabledelayedexpansion
 
 :: --- EINSTELLUNGEN ---
-:: Das Repo MUSS oeffentlich sein, damit kein Login abgefragt wird!
-set "REPO_URL=https://github.com/diggerwf/installer-for-windows.git"
-set "BRANCH=beta-1"
+set "REPO_URL=https://github.com/USER/PROJEKT.git"
+set "BRANCH=main"
 set "START_FILE=start.bat"
 :: ---------------------
 
-echo PRUEFE SYSTEM...
+echo ===========================================
+echo       Projekt-Installer
+echo ===========================================
 
 :CHOOSE_FOLDER
-echo Bitte Ordner im Fenster waehlen...
+echo [+] Bitte Ordner im Fenster waehlen...
 set "psCmd=Add-Type -AssemblyName System.Windows.Forms; $f = New-Object System.Windows.Forms.FolderBrowserDialog; $f.Description = 'Installationsordner waehlen'; if($f.ShowDialog() -eq 'OK'){ $f.SelectedPath }"
 for /f "delims=" %%I in ('powershell -ExecutionPolicy Bypass -Command "%psCmd%"') do set "TARGET_DIR=%%I"
 
 if "%TARGET_DIR%"=="" (
-    echo Abbruch: Kein Ordner gewaehlt.
+    echo [!] Abbruch: Kein Ordner gewaehlt.
     pause
     exit /b
 )
@@ -24,29 +25,40 @@ if "%TARGET_DIR%"=="" (
 :CHECK_GIT
 git --version >nul 2>&1
 if %errorlevel% neq 0 (
-    echo Git wird installiert...
+    echo [+] Git wird installiert...
     winget install --id Git.Git -e --source winget --accept-package-agreements --accept-source-agreements
     set "PATH=%PATH%;C:\Program Files\Git\cmd"
 )
 
 :CLONE_REPO
-echo Klone Projekt...
+echo [+] Wechsle in Zielordner...
 cd /d "%TARGET_DIR%"
-:: Der Befehl klont ohne Account-Abfrage (nur bei Public Repos)
+
+:: PRUEFUNG: Ist der Ordner leer?
+dir /a /b | findstr . >nul 2>&1
+if %errorlevel% equ 0 (
+    echo [!] Ordner ist nicht leer. Erstelle Unterordner...
+    :: Extrahiert den Namen aus der URL (alles nach dem letzten / und ohne .git)
+    for %%F in ("%REPO_URL%") do set "FOLDER_NAME=%%~nF"
+    mkdir "!FOLDER_NAME!" 2>nul
+    cd "!FOLDER_NAME!"
+    echo [+] Neuer Zielpfad: !CD!
+)
+
+echo [+] Klone Projekt (ohne Login)...
 git clone -b %BRANCH% %REPO_URL% .
 
 if %errorlevel% neq 0 (
-    echo Fehler beim Download. Ist das Repo oeffentlich?
+    echo [!] Fehler beim Download.
     pause
     exit /b
 )
 
 :START_LOGIC
 if exist "%START_FILE%" (
-    echo Starte %START_FILE%...
+    echo [+] Starte %START_FILE%...
     call "%START_FILE%"
 ) else (
-    echo %START_FILE% nicht gefunden. Zurueck...
-    cd ..
+    echo [-] %START_FILE% nicht gefunden. Fertig.
     pause
 )

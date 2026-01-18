@@ -12,74 +12,89 @@ echo       Projekt-Installer ^& Updater
 echo ===========================================
 
 :CHOOSE_FOLDER
-echo [+] Bitte Ordner im Fenster waehlen...
+echo [1/4] Ordner-Auswahl...
 set "psCmd=Add-Type -AssemblyName System.Windows.Forms; $f = New-Object System.Windows.Forms.FolderBrowserDialog; $f.Description = 'Zielordner waehlen'; if($f.ShowDialog() -eq 'OK'){ $f.SelectedPath }"
 for /f "delims=" %%I in ('powershell -ExecutionPolicy Bypass -Command "%psCmd%"') do set "TARGET_DIR=%%I"
 
 if "%TARGET_DIR%"=="" (
-    echo [!] Abbruch: Kein Ordner gewaehlt.
+    echo [!] Abbruch: Kein Ordner gewaehlt. [cite: 1]
     pause
     exit /b
 )
 
+echo [+] Gewaehlter Pfad: "%TARGET_DIR%"
 cd /d "%TARGET_DIR%"
 
 :CHECK_GIT
+echo [2/4] Pruefe Systemvoraussetzungen (Git)...
 git --version >nul 2>&1
 if %errorlevel% neq 0 (
-    echo [+] Git wird installiert...
+    echo [!] Git fehlt. Starte Installation via Winget... [cite: 2]
     winget install --id Git.Git -e --source winget --accept-package-agreements --accept-source-agreements [cite: 2]
     set "PATH=%PATH%;C:\Program Files\Git\cmd"
+) else (
+    for /f "tokens=*" %%v in ('git --version') do echo [+] Gefunden: %%v
 )
 
 :PROCESS
-:: Falls bereits eine .git Datei da ist, nur updaten [cite: 3]
+echo [3/4] Analysiere Projekt-Status...
+
 if exist ".git" (
-    echo [+] Bestehendes Projekt gefunden. Pruefe auf Updates... [cite: 3]
-    git remote set-url origin "!REPO_URL!"
-    git -c credential.helper= fetch origin %BRANCH% --quiet [cite: 4]
+    echo [i] Info: Bestehendes Git-Repository erkannt. [cite: 3]
+    echo [+] Synchronisiere mit: %REPO_URL% [cite: 3]
+    git remote set-url origin "!REPO_URL!" [cite: 3]
     
-    for /f "tokens=*" %%a in ('git rev-parse HEAD') do set "LOCAL_HASH=%%a"
-    for /f "tokens=1" %%a in ('git ls-remote origin %BRANCH%') do set "REMOTE_HASH=%%a"
+    echo [+] Suche nach Updates auf Server... 
+    git -c credential.helper= fetch origin %BRANCH% --progress
+    
+    for /f "tokens=*" %%a in ('git rev-parse HEAD') do set "LOCAL_HASH=%%a" 
+    for /f "tokens=1" %%a in ('git ls-remote origin %BRANCH%') do set "REMOTE_HASH=%%a" 
+    
+    echo [i] Lokal:  !LOCAL_HASH:~0,7!
+    echo [i] Server: !REMOTE_HASH:~0,7!
     
     if "!LOCAL_HASH!"=="!REMOTE_HASH!" (
-        echo [+] Alles aktuell. [cite: 5]
+        echo [+] Status: Alles aktuell. Keine Aktion erforderlich. [cite: 5]
     ) else (
-        echo [+] Update verfuegbar. Lade neue Daten... [cite: 5]
-        git pull origin %BRANCH% [cite: 5]
+        echo [!] Status: Update verfuegbar! Lade Daten... [cite: 5]
+        git pull origin %BRANCH% --progress [cite: 5]
     )
 ) else (
-    :: Prüfung ob Ordner leer ist
+    echo [i] Info: Kein Projekt gefunden. Initialisiere Download... [cite: 6]
+    
     dir /a /b | findstr . >nul 2>&1
     if %errorlevel% equ 0 (
-        :: Ordner NICHT leer -> Unterordner erstellen und reingehen
-        for %%F in ("%REPO_URL%") do set "DIR_NAME=%%~nF" 
-        echo [+] Ordner nicht leer. Erstelle Unterordner: !DIR_NAME!
+        for %%F in ("%REPO_URL%") do set "DIR_NAME=%%~nF"
+        echo [!] Warnung: Ordner nicht leer. Erstelle Unterordner: "!DIR_NAME!" [cite: 6]
         
-        :: Klone direkt in den Unterordner
-        git -c credential.helper= clone -b %BRANCH% %REPO_URL% "!DIR_NAME!"
-        if exist "!DIR_NAME!" cd /d "!DIR_NAME!"
+        echo [+] Starte Download (Klonen)...
+        git -c credential.helper= clone -b %BRANCH% --progress %REPO_URL% "!DIR_NAME!"
+        
+        if exist "!DIR_NAME!" (
+            echo [+] Wechsel in Projektverzeichnis...
+            cd /d "!DIR_NAME!"
+        )
     ) else (
-        :: Ordner IST leer -> direkt hierher klonen
-        echo [+] Klone Branch %BRANCH%...
-        git -c credential.helper= clone -b %BRANCH% %REPO_URL% .
+        echo [+] Ordner ist leer. Klone direkt in dieses Verzeichnis... [cite: 6]
+        git -c credential.helper= clone -b %BRANCH% --progress %REPO_URL% . [cite: 6]
     )
 )
 
 :START_LOGIC
-echo.
-echo --- Pruefe Start-Datei ---
+echo [4/4] Abschlussprüfung...
+echo [i] Aktueller Standort: %CD%
+
 if exist "%START_FILE%" (
-    echo [+] %START_FILE% gefunden. Starte jetzt...
+    echo [+] %START_FILE% wurde gefunden.
+    echo [+] Starte Anwendung...
     echo -------------------------------------------
-    call "%START_FILE%"
+    call "%START_FILE%" [cite: 1]
     exit
 ) else (
     echo.
-    echo [!] FEHLER: Die Datei "%START_FILE%" konnte nicht gefunden werden.
-    echo [i] Aktueller Pfad: %CD%
-    echo [i] Inhalt dieses Ordners:
-    dir /b
+    echo [!] KRITISCHER FEHLER: "%START_FILE%" fehlt! [cite: 1]
+    echo [i] Pruefe Inhalt von %CD%:
+    dir /b /a-d
     echo.
     echo Druecke eine belibige Taste um zu beenden
     pause

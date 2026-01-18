@@ -33,13 +33,14 @@ if %errorlevel% neq 0 (
 )
 
 :PROCESS
+:: Variable DIR_NAME initialisieren (leer)
+set "DIR_NAME="
+
 :: Prüfen, ob bereits ein Git-Projekt hier liegt
 if exist ".git" (
     echo [+] Bestehendes Projekt gefunden.
     echo Pruefe auf Updates...
     git remote set-url origin "!REPO_URL!"
-    
-    :: Fetch ohne Prompt
     git -c credential.helper= fetch origin %BRANCH% --quiet
     
     for /f "tokens=*" %%a in ('git rev-parse HEAD') do set "LOCAL_HASH=%%a"
@@ -60,33 +61,55 @@ if exist ".git" (
     if %errorlevel% equ 0 set "IS_EMPTY=NO"
 
     if "!IS_EMPTY!"=="YES" (
-        :: Ordner ist leer, wir können direkt hierher klonen
+        :: Leer: Direkt hier rein klonen
         echo [+] Ordner ist leer. Klone Branch %BRANCH%...
         git -c credential.helper= clone -b %BRANCH% %REPO_URL% .
     ) else (
-        :: Ordner nicht leer, wir müssen einen Unterordner nutzen
+        :: Nicht leer: Unterordner nutzen
         for %%F in ("%REPO_URL%") do set "DIR_NAME=%%~nF"
         echo [!] Ordner nicht leer. Klone in Unterordner: !DIR_NAME!
         
-        :: Git erstellt den Ordner selbst, das ist sicherer als mkdir + cd
         git -c credential.helper= clone -b %BRANCH% %REPO_URL% "!DIR_NAME!"
         
-        :: Wenn erfolgreich, wechsle in den neuen Ordner für den Start-Befehl
+        :: Wir merken uns, dass wir wechseln müssen, tun es aber erst unten sicher
         if exist "!DIR_NAME!" (
             cd "!DIR_NAME!"
-        ) else (
-            echo [!] Fehler beim Klonen.
-            pause
-            exit /b
         )
     )
 )
 
 :START_LOGIC
+echo.
+echo --- Startvorgang ---
+echo [i] Arbeitsverzeichnis: %CD%
+
+:: 1. Versuch: Datei liegt direkt hier
 if exist "%START_FILE%" (
-    echo [+] Starte %START_FILE%...
+    echo [+] %START_FILE% gefunden. Starte...
+    echo -------------------------------------------
     call "%START_FILE%"
-) else (
-    echo [+] Fertig. %START_FILE% nicht gefunden (eventuell Fehler beim Klonen).
-    pause
+    goto :END
 )
+
+:: 2. Versuch: Datei liegt im Unterordner (falls Variable gesetzt)
+if defined DIR_NAME (
+    if exist "!DIR_NAME!\%START_FILE%" (
+        echo [+] Datei im Unterordner "!DIR_NAME!" gefunden.
+        cd "!DIR_NAME!"
+        echo [i] Neues Arbeitsverzeichnis: %CD%
+        echo -------------------------------------------
+        call "%START_FILE%"
+        goto :END
+    )
+)
+
+:: 3. Fehlerfall: Datei nirgends gefunden
+echo.
+echo [!] FEHLER: Die Datei "%START_FILE%" konnte nicht gefunden werden.
+echo [i] Bitte pruefen Sie, ob der Name in der KONFIGURATION oben korrekt ist.
+echo [i] Inhalt des aktuellen Ordners:
+dir /b /a-d
+echo.
+pause
+
+:END

@@ -1,19 +1,19 @@
 @echo off
 setlocal enabledelayedexpansion
 
-:: --- EINSTELLUNGEN ---
-set "REPO_URL=https://github.com/diggerwf/installer-for-windows.git"
-set "BRANCH=beta-1"
+:: --- KONFIGURATION ---
+:: Stelle sicher, dass der Link absolut korrekt ist!
+set "REPO_URL=https://github.com/USER/PROJEKT.git"
+set "BRANCH=main"
 set "START_FILE=start.bat"
 
-:: Verhindert, dass Git ein Login-Fenster oeffnet
-set GIT_TERMINAL_PROMPT=0
-:: Verhindert das Aufpoppen des Git-Credential-Managers
-set GCM_INTERACTIVE=never
+:: Diese Befehle schalten JEDE Login-Abfrage hart aus
+set "GIT_TERMINAL_PROMPT=0"
+set "GCM_INTERACTIVE=never"
 :: ---------------------
 
 echo ===========================================
-echo       Projekt-Installer (No Popup)
+echo       Projekt-Installer (Hard No-Login)
 echo ===========================================
 
 :CHOOSE_FOLDER
@@ -30,34 +30,37 @@ if "%TARGET_DIR%"=="" (
 :CHECK_GIT
 git --version >nul 2>&1
 if %errorlevel% neq 0 (
-    echo [+] Git wird installiert...
+    echo [+] Git wird via Winget installiert...
     winget install --id Git.Git -e --source winget --accept-package-agreements --accept-source-agreements
     set "PATH=%PATH%;C:\Program Files\Git\cmd"
 )
 
 :CLONE_REPO
-echo [+] Wechsle in: "%TARGET_DIR%"
+echo [+] Wechsle in Zielordner...
 cd /d "%TARGET_DIR%"
 
-:: Falls der Ordner nicht leer ist, erstelle einen Unterordner
+:: Ordner-Check: Wenn nicht leer, Unterordner erstellen
 dir /a /b | findstr . >nul 2>&1
 if %errorlevel% equ 0 (
     for %%F in ("%REPO_URL%") do set "DIR_NAME=%%~nF"
-    echo [!] Ordner nicht leer. Nutze Unterordner: !DIR_NAME!
+    echo [!] Ordner nicht leer. Erstelle: !DIR_NAME!
     mkdir "!DIR_NAME!" 2>nul
     cd "!DIR_NAME!"
 )
 
-echo [+] Klone Projekt (Anonym)...
-:: Wir nutzen -c credential.provider=none um den Login-Manager komplett zu deaktivieren
-git -c credential.provider=none clone -b %BRANCH% %REPO_URL% .
+echo [+] Klone Projekt (Erzwungen Anonym)...
+:: -c credential.helper= deaktiviert alle gespeicherten Passwoerter
+:: --config core.askpass=true unterdrueckt externe Dialoge
+git -c credential.helper= clone -b %BRANCH% %REPO_URL% .
 
 if %errorlevel% neq 0 (
     echo.
-    echo [!] FEHLER: Klonen fehlgeschlagen.
-    echo Mögliche Gründe: 
-    echo 1. Das Repo ist PRIVAT (dann ist ein Login zwingend).
-    echo 2. Die URL oben im Skript ist falsch.
+    echo [!] FEHLER: Klonen ohne Login nicht moeglich!
+    echo.
+    echo GRUND 1: Das Repository ist PRIVAT.
+    echo         (Private Repos gehen NIEMALS ohne Login/Token)
+    echo GRUND 2: Die URL ist falsch (Tippfehler?).
+    echo.
     pause
     exit /b
 )

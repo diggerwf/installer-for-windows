@@ -1,14 +1,15 @@
 @echo off
 setlocal enabledelayedexpansion
 
-:: --- EINSTELLUNGEN ---
+:: --- KONFIGURATION ---
+:: Nutze die HTTPS-URL. Bei oeffentlichen Repos ist kein Login noetig.
 set "REPO_URL=https://github.com/USER/PROJEKT.git"
 set "BRANCH=main"
 set "START_FILE=start.bat"
 :: ---------------------
 
 echo ===========================================
-echo       Projekt-Installer
+echo       Projekt-Installer (No Login)
 echo ===========================================
 
 :CHOOSE_FOLDER
@@ -25,40 +26,37 @@ if "%TARGET_DIR%"=="" (
 :CHECK_GIT
 git --version >nul 2>&1
 if %errorlevel% neq 0 (
-    echo [+] Git wird installiert...
+    echo [+] Git wird via Winget installiert...
     winget install --id Git.Git -e --source winget --accept-package-agreements --accept-source-agreements
     set "PATH=%PATH%;C:\Program Files\Git\cmd"
 )
 
 :CLONE_REPO
-echo [+] Wechsle in Zielordner...
+echo [+] Wechsle in Zielordner: "%TARGET_DIR%"
 cd /d "%TARGET_DIR%"
 
-:: PRUEFUNG: Ist der Ordner leer?
-dir /a /b | findstr . >nul 2>&1
-if %errorlevel% equ 0 (
-    echo [!] Ordner ist nicht leer. Erstelle Unterordner...
-    :: Extrahiert den Namen aus der URL (alles nach dem letzten / und ohne .git)
-    for %%F in ("%REPO_URL%") do set "FOLDER_NAME=%%~nF"
-    mkdir "!FOLDER_NAME!" 2>nul
-    cd "!FOLDER_NAME!"
-    echo [+] Neuer Zielpfad: !CD!
-)
+:: Versuch 1: Direkt in den gewaehlten Ordner klonen
+echo [+] Klone Projekt...
+git clone -b %BRANCH% %REPO_URL% . 2>git_error.log
 
-echo [+] Klone Projekt (ohne Login)...
-git clone -b %BRANCH% %REPO_URL% .
-
+:: Wenn Fehler (z.B. Ordner nicht leer), Versuch 2: In Unterordner klonen
 if %errorlevel% neq 0 (
-    echo [!] Fehler beim Download.
-    pause
-    exit /b
+    echo [!] Ordner nicht leer oder Fehler. Erstelle Unterordner...
+    :: Extrahiert Namen aus der URL
+    for %%F in ("%REPO_URL%") do set "DIR_NAME=%%~nF"
+    mkdir "!DIR_NAME!" 2>nul
+    cd "!DIR_NAME!"
+    git clone -b %BRANCH% %REPO_URL% .
 )
+del git_error.log >nul 2>&1
 
 :START_LOGIC
 if exist "%START_FILE%" (
     echo [+] Starte %START_FILE%...
     call "%START_FILE%"
 ) else (
-    echo [-] %START_FILE% nicht gefunden. Fertig.
+    echo [-] %START_FILE% nicht gefunden.
+    echo [+] Aktueller Pfad: !CD!
+    echo [+] Fertig.
     pause
 )

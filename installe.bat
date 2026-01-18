@@ -4,7 +4,7 @@ setlocal enabledelayedexpansion
 :: --- KONFIGURATION ---
 set "REPO_URL=https://github.com/diggerwf/installer-for-windows.git"
 set "BRANCH=beta-1"
-set "START_FILE=start.bat"
+set "START_FILE=start4.bat"
 :: ---------------------
 
 echo ===========================================

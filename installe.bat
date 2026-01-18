@@ -4,14 +4,13 @@ setlocal enabledelayedexpansion
 :: ===========================================
 :: KONFIGURATION
 :: ===========================================
-:: Hier deine Daten anpassen:
 set "REPO_URL=https://github.com/USER/PROJEKT.git"
 set "BRANCH=main"
 set "START_FILE=start.bat"
 :: ===========================================
 
 echo ===========================================
-echo       Projekt-Installer (Clean Version)
+echo       Projekt-Installer
 echo ===========================================
 echo URL:    %REPO_URL%
 echo Branch: %BRANCH%
@@ -20,13 +19,12 @@ echo ===========================================
 echo.
 
 :CHOOSE_FOLDER
-echo [+] Bitte waehle jetzt den Installations-Ordner...
-:: PowerShell Dialog ohne Sonderzeichen
+echo [+] Bitte waehle den Installations-Ordner im Fenster aus...
 set "psCmd=Add-Type -AssemblyName System.Windows.Forms; $f = New-Object System.Windows.Forms.FolderBrowserDialog; $f.Description = 'Ordner waehlen'; if($f.ShowDialog() -eq 'OK'){ $f.SelectedPath }"
 for /f "delims=" %%I in ('powershell -ExecutionPolicy Bypass -Command "%psCmd%"') do set "TARGET_DIR=%%I"
 
 if "%TARGET_DIR%"=="" (
-    echo [!] Abbruch: Kein Ordner ausgewaehlt.
+    echo [!] Kein Ordner gewaehlt. Abbruch.
     pause
     exit /b
 )
@@ -35,53 +33,44 @@ echo [+] Zielordner: "%TARGET_DIR%"
 echo.
 
 :CHECK_GIT
-echo [+] Pruefe ob Git installiert ist...
+echo [+] Pruefe auf Git...
 git --version >nul 2>&1
 if %errorlevel% neq 0 (
-    echo [!] Git fehlt. Installation via Winget startet...
+    echo [!] Git fehlt. Installation via Winget...
     winget install --id Git.Git -e --source winget --accept-package-agreements --accept-source-agreements
-    
     if %errorlevel% neq 0 (
-        echo [!] FEHLER: Git konnte nicht installiert werden.
+        echo [!] Fehler bei der Installation.
         pause
         exit /b
     )
-    :: Pfad fuer diese Sitzung aktualisieren
     set "PATH=%PATH%;C:\Program Files\Git\cmd"
-    echo [+] Git erfolgreich installiert.
+    echo [+] Git installiert.
 ) else (
-    echo [+] Git ist bereits vorhanden.
+    echo [+] Git ist vorhanden.
 )
 
 :CLONE_REPO
-echo.
 echo [+] Klone Branch %BRANCH%...
 cd /d "%TARGET_DIR%"
-
-:: Klont den spezifischen Branch
 git clone -b %BRANCH% %REPO_URL% .
 
 if %errorlevel% neq 0 (
-    echo.
-    echo [!] FEHLER beim Klonen. Ist der Ordner evtl. nicht leer?
+    echo [!] Fehler beim Klonen.
     pause
     exit /b
 )
 
 :START_LOGIC
-echo.
-echo [+] Suche nach der Datei: %START_FILE%
+echo [+] Suche %START_FILE%...
 if exist "%START_FILE%" (
-    echo [+] Datei gefunden! Starte Projekt jetzt...
-    echo.
+    echo [+] Starte Datei...
     call "%START_FILE%"
 ) else (
-    echo [!] %START_FILE% wurde nicht gefunden.
-    echo [+] Gehe einen Ordner zurueck...
+    echo [!] %START_FILE% nicht gefunden.
+    echo [+] Gehe einen Ordner zurueck.
     cd ..
     echo.
-    echo ===========================================
-    echo Vorgang beendet. Beliebige Taste druecken zum Beenden.
+    echo Beendet. Druecke eine Taste.
     pause >nul
     exit
 )

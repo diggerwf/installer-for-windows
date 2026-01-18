@@ -1,1 +1,0 @@
-# Brokkoli-Gie-planung-helfer

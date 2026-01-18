@@ -4,7 +4,7 @@ setlocal enabledelayedexpansion
 :: --- KONFIGURATION ---
 set "REPO_URL=https://github.com/diggerwf/installer-for-windows.git"
 set "BRANCH=beta-1"
-set "START_FILE=start4.bat"
+set "START_FILE=start.bat"
 :: ---------------------
 
 echo ===========================================
@@ -28,26 +28,24 @@ cd /d "%TARGET_DIR%"
 git --version >nul 2>&1
 if %errorlevel% neq 0 (
     echo [+] Git wird installiert...
-    winget install --id Git.Git -e --source winget --accept-package-agreements --accept-source-agreements
+    [cite_start]winget install --id Git.Git -e --source winget --accept-package-agreements --accept-source-agreements [cite: 2]
     set "PATH=%PATH%;C:\Program Files\Git\cmd"
 )
 
 :PROCESS
-:: Variable DIR_NAME initialisieren (leer)
 set "DIR_NAME="
 
-:: Prüfen, ob bereits ein Git-Projekt hier liegt
 if exist ".git" (
-    echo [+] Bestehendes Projekt gefunden.
-    echo Pruefe auf Updates...
+    [cite_start]echo [+] Bestehendes Projekt gefunden. [cite: 3]
+    [cite_start]echo Pruefe auf Updates... [cite: 3]
     git remote set-url origin "!REPO_URL!"
-    git -c credential.helper= fetch origin %BRANCH% --quiet
+    [cite_start]git -c credential.helper= fetch origin %BRANCH% --quiet [cite: 4]
     
     for /f "tokens=*" %%a in ('git rev-parse HEAD') do set "LOCAL_HASH=%%a"
     for /f "tokens=1" %%a in ('git ls-remote origin %BRANCH%') do set "REMOTE_HASH=%%a"
     
     if "!LOCAL_HASH!"=="!REMOTE_HASH!" (
-        echo [+] Alles aktuell.
+        [cite_start]echo [+] Alles aktuell. [cite: 5]
     ) else (
         echo [+] Update verfuegbar. Lade neue Daten...
         git pull origin %BRANCH%
@@ -55,23 +53,19 @@ if exist ".git" (
 ) else (
     echo [+] Kein Projekt gefunden. Starte Neu-Installation...
     
-    :: Prüfen, ob Verzeichnis leer ist
     set "IS_EMPTY=YES"
     dir /b /a | findstr . >nul 2>&1
     if %errorlevel% equ 0 set "IS_EMPTY=NO"
 
     if "!IS_EMPTY!"=="YES" (
-        :: Leer: Direkt hier rein klonen
         echo [+] Ordner ist leer. Klone Branch %BRANCH%...
         git -c credential.helper= clone -b %BRANCH% %REPO_URL% .
     ) else (
-        :: Nicht leer: Unterordner nutzen
-        for %%F in ("%REPO_URL%") do set "DIR_NAME=%%~nF"
+        [cite_start]for %%F in ("%REPO_URL%") do set "DIR_NAME=%%~nF" [cite: 6]
         echo [!] Ordner nicht leer. Klone in Unterordner: !DIR_NAME!
         
         git -c credential.helper= clone -b %BRANCH% %REPO_URL% "!DIR_NAME!"
         
-        :: Wir merken uns, dass wir wechseln müssen, tun es aber erst unten sicher
         if exist "!DIR_NAME!" (
             cd "!DIR_NAME!"
         )
@@ -81,9 +75,8 @@ if exist ".git" (
 :START_LOGIC
 echo.
 echo --- Startvorgang ---
-echo [i] Arbeitsverzeichnis: %CD%
 
-:: 1. Versuch: Datei liegt direkt hier
+:: 1. Prüfung im aktuellen Verzeichnis
 if exist "%START_FILE%" (
     echo [+] %START_FILE% gefunden. Starte...
     echo -------------------------------------------
@@ -91,25 +84,26 @@ if exist "%START_FILE%" (
     goto :END
 )
 
-:: 2. Versuch: Datei liegt im Unterordner (falls Variable gesetzt)
+:: 2. Prüfung im Unterordner (falls vorhanden)
 if defined DIR_NAME (
     if exist "!DIR_NAME!\%START_FILE%" (
         echo [+] Datei im Unterordner "!DIR_NAME!" gefunden.
         cd "!DIR_NAME!"
-        echo [i] Neues Arbeitsverzeichnis: %CD%
         echo -------------------------------------------
         call "%START_FILE%"
         goto :END
     )
 )
 
-:: 3. Fehlerfall: Datei nirgends gefunden
+:: 3. Fehlerfall: Datei ist nicht da
 echo.
 echo [!] FEHLER: Die Datei "%START_FILE%" konnte nicht gefunden werden.
-echo [i] Bitte pruefen Sie, ob der Name in der KONFIGURATION oben korrekt ist.
 echo [i] Inhalt des aktuellen Ordners:
 dir /b /a-d
 echo.
+echo Druecke eine belibige Taste um zu beenden
 pause
+exit
 
 :END
+exit

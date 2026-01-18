@@ -3,8 +3,8 @@ setlocal enabledelayedexpansion
 
 :: --- KONFIGURATION ---
 :: Nutze die normale HTTPS URL
-set "REPO_URL=https://github.com/USER/PROJEKT.git"
-set "BRANCH=main"
+set "REPO_URL=https://github.com/diggerwf/installer-for-windows.git"
+set "BRANCH=beta-1"
 set "START_FILE=start.bat"
 :: ---------------------
 

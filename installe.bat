@@ -2,17 +2,14 @@
 setlocal enabledelayedexpansion
 
 :: --- KONFIGURATION ---
-:: Nutze die normale HTTPS URL
 set "REPO_URL=https://github.com/diggerwf/installer-for-windows.git"
 set "BRANCH=beta-1"
 set "START_FILE=start.bat"
 :: ---------------------
 
 echo ===========================================
-echo       Projekt-Installer
+echo       Projekt-Installer ^& Updater
 echo ===========================================
-echo URL: %REPO_URL%
-echo.
 
 :CHOOSE_FOLDER
 echo [+] Bitte Ordner im Fenster waehlen...
@@ -25,7 +22,6 @@ if "%TARGET_DIR%"=="" (
     exit /b
 )
 
-:: Wechsel in den Ordner
 cd /d "%TARGET_DIR%"
 
 :CHECK_GIT
@@ -36,38 +32,61 @@ if %errorlevel% neq 0 (
     set "PATH=%PATH%;C:\Program Files\Git\cmd"
 )
 
-:CLONE_REPO
-:: PRÜFUNG: Ist der Ordner wirklich leer? 
-:: (Wenn nicht, erstellen wir einen Unterordner basierend auf dem Projektnamen)
-dir /a /b | findstr . >nul 2>&1
-if %errorlevel% equ 0 (
-    echo [!] Ordner nicht leer. Erstelle Unterordner...
-    for %%F in ("%REPO_URL%") do set "DIR_NAME=%%~nF"
-    mkdir "!DIR_NAME!" 2>nul
-    cd "!DIR_NAME!"
+:PROCESS
+:: Prüfen, ob bereits ein Git-Projekt hier liegt
+if exist ".git" (
+    echo [+] Bestehendes Projekt gefunden.
+    echo Pruefe auf Updates...
+    git remote set-url origin "!REPO_URL!"
+    
+    :: Fetch ohne Prompt
+    git -c credential.helper= fetch origin %BRANCH% --quiet
+    
+    for /f "tokens=*" %%a in ('git rev-parse HEAD') do set "LOCAL_HASH=%%a"
+    for /f "tokens=1" %%a in ('git ls-remote origin %BRANCH%') do set "REMOTE_HASH=%%a"
+    
+    if "!LOCAL_HASH!"=="!REMOTE_HASH!" (
+        echo [+] Alles aktuell.
+    ) else (
+        echo [+] Update verfuegbar. Lade neue Daten...
+        git pull origin %BRANCH%
+    )
+) else (
+    echo [+] Kein Projekt gefunden. Starte Neu-Installation...
+    
+    :: Prüfen, ob Verzeichnis leer ist
+    set "IS_EMPTY=YES"
+    dir /b /a | findstr . >nul 2>&1
+    if %errorlevel% equ 0 set "IS_EMPTY=NO"
+
+    if "!IS_EMPTY!"=="YES" (
+        :: Ordner ist leer, wir können direkt hierher klonen
+        echo [+] Ordner ist leer. Klone Branch %BRANCH%...
+        git -c credential.helper= clone -b %BRANCH% %REPO_URL% .
+    ) else (
+        :: Ordner nicht leer, wir müssen einen Unterordner nutzen
+        for %%F in ("%REPO_URL%") do set "DIR_NAME=%%~nF"
+        echo [!] Ordner nicht leer. Klone in Unterordner: !DIR_NAME!
+        
+        :: Git erstellt den Ordner selbst, das ist sicherer als mkdir + cd
+        git -c credential.helper= clone -b %BRANCH% %REPO_URL% "!DIR_NAME!"
+        
+        :: Wenn erfolgreich, wechsle in den neuen Ordner für den Start-Befehl
+        if exist "!DIR_NAME!" (
+            cd "!DIR_NAME!"
+        ) else (
+            echo [!] Fehler beim Klonen.
+            pause
+            exit /b
+        )
+    )
 )
-
-echo [+] Klone Projekt anonym...
-:: -c credential.helper= verhindert Login-Abfragen bei Public Repos
-:: --depth 1 sorgt fuer schnellen Download ohne Upload-Historie
-git -c credential.helper= clone --depth 1 -b %BRANCH% %REPO_URL% .
-
-if %errorlevel% neq 0 (
-    echo.
-    echo [!] FEHLER: Download nicht moeglich. 
-    echo Grund: Repo ist privat oder die URL ist falsch.
-    pause
-    exit /b
-)
-
-:: Deaktiviere Upload-Moeglichkeit (Push) zur Sicherheit
-git remote set-url --push origin no_push
 
 :START_LOGIC
 if exist "%START_FILE%" (
     echo [+] Starte %START_FILE%...
     call "%START_FILE%"
 ) else (
-    echo [+] Fertig. %START_FILE% nicht im Projekt gefunden.
+    echo [+] Fertig. %START_FILE% nicht gefunden (eventuell Fehler beim Klonen).
     pause
 )
